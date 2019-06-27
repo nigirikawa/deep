@@ -21,8 +21,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
 
-DEEP_NETWORK = "50-32-16-10"
-epoch = "10"
+DEEP_NETWORK = "121-7-10"
+epoch = "10000"
 savePath = "dir" + DEEP_NETWORK + "--" + epoch + "--" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
 os.mkdir(savePath)
 
