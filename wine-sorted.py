@@ -1,8 +1,8 @@
 from __future__ import print_function
 
-import os
-import datetime
 import csv
+import datetime
+import os
 import os.path
 
 import keras
@@ -19,15 +19,46 @@ from pandas import Series, DataFrame
 from sklearn import svm
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ModelCheckpoint
+import copy
 
-
-DEEP_NETWORK = "121-7-10"
-epoch = "10000"
-savePath = "dir" + DEEP_NETWORK + "--" + epoch + "--" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
-os.mkdir(savePath)
 
 def main():
-    # CSVファイルの読み込み
+    network_template = {
+        3:[None, "1", "2", "4", "8", "16", "32", "64", "128"],  # 3層目
+        2:[None, "1", "2", "4", "8", "16", "32", "64", "128"],  # 2層目
+        1:["1", "2", "4", "8", "16", "32", "64", "128"],# 1層目
+    }
+
+    input_layer = 11
+    output_layer = 10
+    epoch = "10000"
+    parent_path = "test1" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
+    os.mkdir(parent_path)
+
+    train_tset_data = create_test_data(parent_path)
+
+    for layer3 in network_template[3]:
+        for layer2 in network_template[2]:
+            for layer1 in network_template[1]:
+                network = ""
+                if layer3 is None:
+                    if layer2 is None:
+                        network = [layer1]
+                    else:
+                        network = [layer1, layer2]
+                else:
+                    if layer2 is None:
+                        continue
+                    else:
+                        network = [layer1, layer2, layer3]
+
+                print(network)
+                learn(network=network, epoch=epoch, input_layer=input_layer, output_layer=output_layer,
+                  parent_path=parent_path, train_and_test_data=train_tset_data)
+
+def create_test_data(save_path):
     wine_data_set = pd.read_csv("sorted-redwine-data.csv", header=0)
 
     x_test = DataFrame()
@@ -46,16 +77,24 @@ def main():
         x_test = pd.concat([x_test, vx_test])
         y_test = pd.concat([y_test, vy_test])
 
-    # mPrint(x_test)
-    # mPrint(y_test)
-    # mPrint(x_train)
-    # mPrint(y_train)
-
     x_testCopy = x_test.copy()
     y_testCopy = y_test.copy()
     x_trainCopy = x_train.copy()
     y_trainCopy = y_train.copy()
 
+    test = pd.concat([x_testCopy, y_testCopy], axis=1)
+    train = pd.concat([x_trainCopy, y_trainCopy], axis=1)
+    test.to_csv(save_path + "/test.csv", index=False)
+    train.to_csv(save_path + "/train.csv", index=False)
+
+    return x_train, y_train, x_test, y_test
+
+def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_path="."):
+    x_train, y_train, x_test, y_test = train_and_test_data
+
+    # CSVファイルの読み込み
+    savePath = parent_path + "/dir" + str(input_layer) + "-" + "-".join(network) + "-" + str(output_layer) + "--" + epoch
+    os.mkdir(savePath)
 
     # データの整形
     x_train = x_train.astype(np.float)
@@ -67,27 +106,34 @@ def main():
     # ニューラルネットワークの実装①
     model = Sequential()
 
-    nodeNumbers = DEEP_NETWORK.split("-")
+    nodeNumbers = network.copy()
 
-    model.add(Dense(int(nodeNumbers[0]), activation='relu', input_shape=(11,)))
+    # 一個目の隠れ層と入力層
+    model.add(Dense(int(nodeNumbers[0]), activation='relu', input_dim=input_layer))
     model.add(Dropout(0.2))
 
+    # 二個目以降の隠れ層
     for nodeNumber in nodeNumbers[1:-1]:
         model.add(Dense(int(nodeNumber), activation='relu'))
         model.add(Dropout(0.2))
 
-    model.add(Dense(int(nodeNumbers[-1]), activation='softmax'))
+    # 出力層
+    model.add(Dense(output_layer, activation='softmax'))
 
     # モデルを要約するらしい。ちょっと意味がわからないです。
     model.summary()
 
+    # Early Stopping のコールバック作成
+    es = EarlyStopping(monitor="val_loss", min_delta=0.001, patience=500, mode="min")
+    fpath = savePath+'/weights.{epoch:02d}-{loss:.2f}-{acc:.2f}-{val_loss:.2f}-{val_acc:.2f}.hdf5'
+    mc = ModelCheckpoint(filepath=fpath, monitor='val_loss', save_best_only=True, mode='auto')
+
     model.compile(loss="mean_squared_error", optimizer=RMSprop(), metrics=["accuracy"])
 
-    # model.load_weights("weight_1000_500_500_500_30000.txt")
-
     # ニューラルネットワークの学習
-    history = model.fit(x_train, y_train, batch_size=200, epochs=int(epoch), verbose=1,
-                        validation_data=(x_test, y_test))
+    history = model.fit(x_train, y_train, batch_size=500, epochs=int(epoch), verbose=1,
+                        validation_data=(x_test, y_test),
+                        callbacks=[es, mc])
     # history = model.fit(x_train, y_train,batch_size=200,epochs=30,verbose=1,validation_data=(x_test, y_test))
 
     # ニューラルネットワークの推論
@@ -96,52 +142,16 @@ def main():
     print("Test loss:", score[0])
     print("Test accuracy:", score[1])
 
-    # 10段階評価したいワインの成分を設定
-    # sample = [7.9, 0.35, 0.46, 5, 0.078, 15, 37, 0.9973, 3.35, 0.86, 12.8]
-    sample = [0, 0, 0, 0, 0, 0, 0, 1, 7, 0, 0]
-    print("\n")
-    print("--サンプルワインのデータ--")
-
-    print(sample)
-
-    # ポイント：ワインの成分をNumpyのArrayにしないとエラーが出る
-    sample = np.array(sample)
-    print(type(sample))
-    predict = model.predict_classes(sample.reshape(1, -1), batch_size=1, verbose=0)
-
-    print("\n")
-    print("--予測値--")
-    print(predict)
-    print("--正解値--")
-    print(str(8))
-    print("\n")
-
-    model_json = model.to_json();
-    file = open(savePath + "/model.json", "w")
-    file.write(model_json)
-    file.close()
-    model.save_weights(savePath + "/weight.txt")
-
-    print(model_json)
-
-    print("-----------------------------------------------------------------------------------")
-    print("全データ判定")
-    print("-----------------------------------------------------------------------------------")
-    result = getPredictAllDatas(model, wine_data_set)
-
-    test = pd.concat([x_testCopy, y_testCopy], axis=1)
-    train = pd.concat([x_trainCopy, y_trainCopy], axis=1)
-    test.to_csv(savePath + "/test.csv", index=False)
-    train.to_csv(savePath + "/train.csv", index=False)
-    testResult = getPredictAllDatas(model, test)
-    trainResult = getPredictAllDatas(model, test)
-
-    result.to_csv(savePath + "/predict.csv")
-    testResult.to_csv(savePath + "/testPredict.csv")
-    trainResult.to_csv(savePath + "/trainPredict.csv")
+    # testResult = getPredictAllDatas(model, test)
+    # trainResult = getPredictAllDatas(model, test)
+    #
+    # result.to_csv(savePath + "/predict.csv")
+    # testResult.to_csv(savePath + "/testPredict.csv")
+    # trainResult.to_csv(savePath + "/trainPredict.csv")
 
     # 学習履歴をプロット
-    save_history_fig(history)
+    save_history_fig(history, savePath)
+    print(str(network) + " 学習完了")
 
 
 def getPredictAllDatas(model, dataFrameDatas):
@@ -161,7 +171,7 @@ def getPredictAllDatas(model, dataFrameDatas):
     # http://aidiary.hatenablog.com/entry/20161109/1478696865
 
 
-def save_history_fig(history):
+def save_history_fig(history, savePath):
     # print(history.history.keys())
 
     # 精度の履歴をプロット
@@ -173,6 +183,7 @@ def save_history_fig(history):
     plt.ylabel('accuracy')
     plt.legend(['acc', 'val_acc'], loc='lower right')
     plt.savefig(savePath + "/acc.png")
+    plt.close()
 
     # 損失の履歴をプロット
     plt.figure()
@@ -183,6 +194,7 @@ def save_history_fig(history):
     plt.ylabel('loss')
     plt.legend(['loss', 'val_loss'], loc='lower right')
     plt.savefig(savePath + "/loss.png")
+    plt.close()
 
 
 def mPrint(obj):
