@@ -26,9 +26,9 @@ import copy
 
 def main():
     network_template = {
-        3:[None, "1", "2", "4", "8", "16", "32", "64", "128"],  # 3層目
-        2:[None, "1", "2", "4", "8", "16", "32", "64", "128"],  # 2層目
-        1:["1", "2", "4", "8", "16", "32", "64", "128"],# 1層目
+        3:[None, "1", "2", "4", "8", "16", "32", "64", "128", "256"],  # 3層目
+        2:[None, "1", "2", "4", "8", "16", "32", "64", "128", "256"],  # 2層目
+        1:["1", "2", "4", "8", "16", "32", "64", "128", "256"],# 1層目
     }
 
     input_layer = 11
@@ -124,7 +124,7 @@ def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_
     model.summary()
 
     # Early Stopping のコールバック作成
-    es = EarlyStopping(monitor="val_loss", min_delta=0.001, patience=500, mode="min")
+    es = EarlyStopping(monitor="val_loss", min_delta=0.001, patience=1000, mode="min")
     fpath = savePath+'/weights.{epoch:02d}-{loss:.2f}-{acc:.2f}-{val_loss:.2f}-{val_acc:.2f}.hdf5'
     mc = ModelCheckpoint(filepath=fpath, monitor='val_loss', save_best_only=True, mode='auto')
 
