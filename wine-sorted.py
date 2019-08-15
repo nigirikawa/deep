@@ -28,39 +28,47 @@ from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
 
 def main():
-    network_template = {
-        3:[None, "1", "2", "4", "8", "16", "32", "64", "128", "256"],  # 3層目
-        2:[None, "1", "2", "4", "8", "16", "32", "64", "128", "256"],  # 2層目
-        1:["1", "2", "4", "8", "16", "32", "64", "128", "256"],# 1層目
-    }
-
-    input_layer = 11
-    output_layer = 10
-    epoch = "10000"
-    parent_path = "test1" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
+    # 出力フォルダを作成
+    parent_path = "test1_" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
     os.mkdir(parent_path)
 
+    input_layer = 11  # 入力層
+    output_layer = 10 # 出力層
+    epoch = "100"     # 学習回数
+    
+    # 隠れ層のノードの組み合わを作成
+    # layerListは1階層のみから3階層まで含めた全組み合わせ
+    network_template = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    layerList = []
+    
+    for i in range(1, 4):
+        layerList.extend(
+            itertools.product(network_template, repeat=i)
+        )
+
+    # 隠れ層のノードの組み合わせ確認用
+    # pprint.pprint(layerList)
+
+    network_out_template = [True, False]
+   
+    # トレーニングデータとテストデータに分割
     train_tset_data = create_test_data(parent_path)
+    
+    for layers in layerList:
+        network = list(layers)
+        
+        network_out_list = list(itertools.product(network_out_template, repeat = len(layers)))
 
-    for layer3 in network_template[3]:
-        for layer2 in network_template[2]:
-            for layer1 in network_template[1]:
-                network = ""
-                if layer3 is None:
-                    if layer2 is None:
-                        network = [layer1]
-                    else:
-                        network = [layer1, layer2]
-                else:
-                    if layer2 is None:
-                        continue
-                    else:
-                        network = [layer1, layer2, layer3]
+        for network_out in network_out_list:
+            network_out = list(network_out)
+            print(" ---- 隠れ層のノードパターン -----")
+            print(network)
+            print(network_out)
+            
+            learn(network=network, network_out=network_out,epoch=epoch, input_layer=input_layer, output_layer=output_layer,
+                      parent_path=parent_path, train_and_test_data=train_tset_data) 
 
-                print(network)
-                learn(network=network, epoch=epoch, input_layer=input_layer, output_layer=output_layer,
-                  parent_path=parent_path, train_and_test_data=train_tset_data)
-
+# テストデータとトレーニングデータを作成
 def create_test_data(save_path):
     wine_data_set = pd.read_csv("sorted-redwine-data.csv", header=0)
 
