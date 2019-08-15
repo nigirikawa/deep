@@ -2,7 +2,7 @@ import glob
 import re
 import csv
 
-files = glob.glob("test120190629*/dir*/*.hdf5")
+files = glob.glob("test1_20190814*/dir*/*.hdf5")
 pattern = ".*dir.*weights.(\d+)-(\d.\d+)-(\d.\d+)-(\d.\d+)-(\d.\d+).*"
 with open("./result.csv", "w") as f:
     writer = csv.writer(f, lineterminator="\n")
