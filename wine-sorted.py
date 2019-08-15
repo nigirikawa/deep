@@ -100,11 +100,14 @@ def create_test_data(save_path):
 
     return x_train, y_train, x_test, y_test
 
-def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_path="."):
+def learn(network, network_out, epoch, input_layer, output_layer,train_and_test_data, parent_path="."):
     x_train, y_train, x_test, y_test = train_and_test_data
 
-    # CSVファイルの読み込み
-    savePath = parent_path + "/dir" + str(input_layer) + "-" + "-".join(network) + "-" + str(output_layer) + "--" + epoch
+    # CSVファイル出力
+    savePath = ( parent_path + "/dir" + str(input_layer) + 
+                "-N" + "_".join(map(str,network)) + 
+                "-O" + "_".join(map(str,network_out)) + 
+                "-"+ str(output_layer) + "--" + epoch)
     os.mkdir(savePath)
 
     # データの整形
@@ -117,16 +120,16 @@ def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_
     # ニューラルネットワークの実装①
     model = Sequential()
 
-    nodeNumbers = network.copy()
+    # 入力層
+    model.add(InputLayer(input_shape=(input_layer,)))
 
-    # 一個目の隠れ層と入力層
-    model.add(Dense(int(nodeNumbers[0]), activation='relu', input_dim=input_layer))
-    model.add(Dropout(0.2))
-
-    # 二個目以降の隠れ層
-    for nodeNumber in nodeNumbers[1:-1]:
+    # 隠れ層
+    for nodeNumber, isDropout in zip(network, network_out):
+        print("nodeNumber")
+        print(nodeNumber)
         model.add(Dense(int(nodeNumber), activation='relu'))
-        model.add(Dropout(0.2))
+        if isDropout:
+            model.add(Dropout(0.2))
 
     # 出力層
     model.add(Dense(output_layer, activation='softmax'))
@@ -142,13 +145,13 @@ def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_
     model.compile(loss="mean_squared_error", optimizer=RMSprop(), metrics=["accuracy"])
 
     # ニューラルネットワークの学習
-    history = model.fit(x_train, y_train, batch_size=500, epochs=int(epoch), verbose=1,
+    history = model.fit(x_train, y_train, batch_size=500, epochs=int(epoch), verbose=0,
                         validation_data=(x_test, y_test),
                         callbacks=[es, mc])
-    # history = model.fit(x_train, y_train,batch_size=200,epochs=30,verbose=1,validation_data=(x_test, y_test))
 
     # ニューラルネットワークの推論
     score = model.evaluate(x_test, y_test, verbose=1)
+
     print("\n")
     print("Test loss:", score[0])
     print("Test accuracy:", score[1])
