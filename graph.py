@@ -6,7 +6,7 @@ import pandas as pd
 
 def main():
     result = pd.read_csv("result_processed.csv", encoding="ms932")
-    result = result.drop(columns=["ファイル名", "入力", "隠れ層1", "隠れ層2", "隠れ層3", "出力", "隠れ層の数", "loss", "acc", "val_acc"])
+    result = result.loc[:, ["directory", "epoch", "val_loss"]]
     group = result.groupby("directory")
 
     dict = {}
@@ -24,7 +24,6 @@ def main():
     x = list(dict.keys())
     values = list(dict.values())
 
-
     for value in values:
         y = []
         z = []
@@ -33,21 +32,16 @@ def main():
             y.append(val[0])
             z.append(val[1])
 
-
         plt.plot(y, z, marker=".")
     # plt.scatter(y, z, marker=".")
 
-
     plt.show()
-
+    plt.savefig('plot.png')
 
     Y,Z = np.meshgrid(y, z)
 
     # print(Y)
     # print(Z)
-
-
-
 
     # x, y = x.ravel(), y.ravel()
     # dx, dy, dz = 0.1, 0.1, dict.values()[1]
@@ -76,6 +70,7 @@ def test():
 
     ax.plot_wireframe(1, 1, 1)
     plt.show()
+    plt.savefig('plot.png')
 
 def func1(x, y):
     return x ** 2 + y ** 2
