@@ -131,7 +131,7 @@ def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_
     # 出力層
     model.add(Dense(output_layer, activation='softmax'))
 
-    # モデルを要約するらしい。ちょっと意味がわからないです。
+    # 作成したニュートラルネットワークの構成を文字列形式で出力
     model.summary()
 
     # Early Stopping のコールバック作成
@@ -178,40 +178,28 @@ def getPredictAllDatas(model, dataFrameDatas):
     result["predict"] = predictList
     return result
 
-    # 学習履歴のグラフ化に関する参考資料
-    # http://aidiary.hatenablog.com/entry/20161109/1478696865
-
-
+# 学習結果を画像に出力
 def save_history_fig(history, savePath):
-    # print(history.history.keys())
+    fig, (pltL, pltR) = plt.subplots(ncols=2, figsize=(10,4), sharex=True)
 
     # 精度の履歴をプロット
-    plt.figure()
-    plt.plot(history.history['acc'])
-    plt.plot(history.history['val_acc'])
-    plt.title('model accuracy')
-    plt.xlabel('epoch')
-    plt.ylabel('accuracy')
-    plt.legend(['acc', 'val_acc'], loc='lower right')
-    plt.savefig(savePath + "/acc.png")
-    plt.close()
+    pltL.plot(history.history['acc'])
+    pltL.plot(history.history['val_acc'])
+    pltL.set_title('model accuracy')
+    pltL.set_xlabel('epoch')
+    pltL.set_ylabel('accuracy')
+    pltL.set_ylim([0.0,1.0])
+    pltL.legend(['acc', 'val_acc'], loc='lower right')
 
     # 損失の履歴をプロット
-    plt.figure()
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.legend(['loss', 'val_loss'], loc='lower right')
-    plt.savefig(savePath + "/loss.png")
-    plt.close()
+    pltR.plot(history.history['loss'])
+    pltR.plot(history.history['val_loss'])
+    pltR.set_title('model loss')
+    pltR.set_xlabel('epoch')
+    pltR.set_ylabel('loss')
+    pltR.legend(['loss', 'val_loss'], loc='lower right')
 
-
-def mPrint(obj):
-    print("type:\t" + str(type(obj)))
-    print("value:\t" + str(obj))
-
+    fig.savefig(savePath + '/plot.png')
 
 main()
 print("完了しました")
