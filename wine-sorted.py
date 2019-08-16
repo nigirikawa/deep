@@ -9,8 +9,13 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+import copy
+import itertools
+import pprint
+
 from keras.datasets import fashion_mnist
-from keras.layers import Dense, Dropout
+from keras.layers import InputLayer, Dense, Dropout
 from keras.models import Sequential
 from keras.optimizers import Adam
 from keras.optimizers import RMSprop
@@ -21,43 +26,49 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
-import copy
-
 
 def main():
-    network_template = {
-        3:[None, "1", "2", "4", "8", "16", "32", "64", "128", "256"],  # 3層目
-        2:[None, "1", "2", "4", "8", "16", "32", "64", "128", "256"],  # 2層目
-        1:["1", "2", "4", "8", "16", "32", "64", "128", "256"],# 1層目
-    }
-
-    input_layer = 11
-    output_layer = 10
-    epoch = "10000"
-    parent_path = "test1" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
+    # 出力フォルダを作成
+    parent_path = "test1_" + datetime.datetime.today().strftime("%Y%m%d-%H%M%S")
     os.mkdir(parent_path)
 
+    input_layer = 11  # 入力層
+    output_layer = 10 # 出力層
+    epoch = "100"     # 学習回数
+    
+    # 隠れ層のノードの組み合わを作成
+    # layerListは1階層のみから3階層まで含めた全組み合わせ
+    network_template = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    layerList = []
+    
+    for i in range(1, 4):
+        layerList.extend(
+            itertools.product(network_template, repeat=i)
+        )
+
+    # 隠れ層のノードの組み合わせ確認用
+    # pprint.pprint(layerList)
+
+    network_out_template = [True, False]
+   
+    # トレーニングデータとテストデータに分割
     train_tset_data = create_test_data(parent_path)
+    
+    for layers in layerList:
+        network = list(layers)
+        
+        network_out_list = list(itertools.product(network_out_template, repeat = len(layers)))
 
-    for layer3 in network_template[3]:
-        for layer2 in network_template[2]:
-            for layer1 in network_template[1]:
-                network = ""
-                if layer3 is None:
-                    if layer2 is None:
-                        network = [layer1]
-                    else:
-                        network = [layer1, layer2]
-                else:
-                    if layer2 is None:
-                        continue
-                    else:
-                        network = [layer1, layer2, layer3]
+        for network_out in network_out_list:
+            network_out = list(network_out)
+            print(" ---- 隠れ層のノードパターン -----")
+            print(network)
+            print(network_out)
+            
+            learn(network=network, network_out=network_out,epoch=epoch, input_layer=input_layer, output_layer=output_layer,
+                      parent_path=parent_path, train_and_test_data=train_tset_data) 
 
-                print(network)
-                learn(network=network, epoch=epoch, input_layer=input_layer, output_layer=output_layer,
-                  parent_path=parent_path, train_and_test_data=train_tset_data)
-
+# テストデータとトレーニングデータを作成
 def create_test_data(save_path):
     wine_data_set = pd.read_csv("sorted-redwine-data.csv", header=0)
 
@@ -89,11 +100,14 @@ def create_test_data(save_path):
 
     return x_train, y_train, x_test, y_test
 
-def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_path="."):
+def learn(network, network_out, epoch, input_layer, output_layer,train_and_test_data, parent_path="."):
     x_train, y_train, x_test, y_test = train_and_test_data
 
-    # CSVファイルの読み込み
-    savePath = parent_path + "/dir" + str(input_layer) + "-" + "-".join(network) + "-" + str(output_layer) + "--" + epoch
+    # CSVファイル出力
+    savePath = ( parent_path + "/dir" + str(input_layer) + 
+                "-N" + "_".join(map(str,network)) + 
+                "-O" + "_".join(map(str,network_out)) + 
+                "-"+ str(output_layer) + "--" + epoch)
     os.mkdir(savePath)
 
     # データの整形
@@ -106,21 +120,21 @@ def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_
     # ニューラルネットワークの実装①
     model = Sequential()
 
-    nodeNumbers = network.copy()
+    # 入力層
+    model.add(InputLayer(input_shape=(input_layer,)))
 
-    # 一個目の隠れ層と入力層
-    model.add(Dense(int(nodeNumbers[0]), activation='relu', input_dim=input_layer))
-    model.add(Dropout(0.2))
-
-    # 二個目以降の隠れ層
-    for nodeNumber in nodeNumbers[1:-1]:
+    # 隠れ層
+    for nodeNumber, isDropout in zip(network, network_out):
+        print("nodeNumber")
+        print(nodeNumber)
         model.add(Dense(int(nodeNumber), activation='relu'))
-        model.add(Dropout(0.2))
+        if isDropout:
+            model.add(Dropout(0.2))
 
     # 出力層
     model.add(Dense(output_layer, activation='softmax'))
 
-    # モデルを要約するらしい。ちょっと意味がわからないです。
+    # 作成したニュートラルネットワークの構成を文字列形式で出力
     model.summary()
 
     # Early Stopping のコールバック作成
@@ -131,13 +145,13 @@ def learn(network, epoch, input_layer, output_layer,train_and_test_data, parent_
     model.compile(loss="mean_squared_error", optimizer=RMSprop(), metrics=["accuracy"])
 
     # ニューラルネットワークの学習
-    history = model.fit(x_train, y_train, batch_size=500, epochs=int(epoch), verbose=1,
+    history = model.fit(x_train, y_train, batch_size=500, epochs=int(epoch), verbose=0,
                         validation_data=(x_test, y_test),
                         callbacks=[es, mc])
-    # history = model.fit(x_train, y_train,batch_size=200,epochs=30,verbose=1,validation_data=(x_test, y_test))
 
     # ニューラルネットワークの推論
     score = model.evaluate(x_test, y_test, verbose=1)
+
     print("\n")
     print("Test loss:", score[0])
     print("Test accuracy:", score[1])
@@ -167,40 +181,28 @@ def getPredictAllDatas(model, dataFrameDatas):
     result["predict"] = predictList
     return result
 
-    # 学習履歴のグラフ化に関する参考資料
-    # http://aidiary.hatenablog.com/entry/20161109/1478696865
-
-
+# 学習結果を画像に出力
 def save_history_fig(history, savePath):
-    # print(history.history.keys())
+    fig, (pltL, pltR) = plt.subplots(ncols=2, figsize=(10,4), sharex=True)
 
     # 精度の履歴をプロット
-    plt.figure()
-    plt.plot(history.history['acc'])
-    plt.plot(history.history['val_acc'])
-    plt.title('model accuracy')
-    plt.xlabel('epoch')
-    plt.ylabel('accuracy')
-    plt.legend(['acc', 'val_acc'], loc='lower right')
-    plt.savefig(savePath + "/acc.png")
-    plt.close()
+    pltL.plot(history.history['acc'])
+    pltL.plot(history.history['val_acc'])
+    pltL.set_title('model accuracy')
+    pltL.set_xlabel('epoch')
+    pltL.set_ylabel('accuracy')
+    pltL.set_ylim([0.0,1.0])
+    pltL.legend(['acc', 'val_acc'], loc='lower right')
 
     # 損失の履歴をプロット
-    plt.figure()
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.legend(['loss', 'val_loss'], loc='lower right')
-    plt.savefig(savePath + "/loss.png")
-    plt.close()
+    pltR.plot(history.history['loss'])
+    pltR.plot(history.history['val_loss'])
+    pltR.set_title('model loss')
+    pltR.set_xlabel('epoch')
+    pltR.set_ylabel('loss')
+    pltR.legend(['loss', 'val_loss'], loc='lower right')
 
-
-def mPrint(obj):
-    print("type:\t" + str(type(obj)))
-    print("value:\t" + str(obj))
-
+    fig.savefig(savePath + '/plot.png')
 
 main()
 print("完了しました")
